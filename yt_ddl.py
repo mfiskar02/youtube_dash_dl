@@ -389,7 +389,7 @@ def main(ffmpeg_executable, ffprobe_executable):
     # video = download(v[0], total_segments, 4)
     # audio = download(a[0], total_segments, 4)
     mux_to_file(output_path, audio, video)
-    print("\nVideosoubor byl uspesne stazen.")
+    print("\nVideosoubor byl uspesne stazen,vyckejte na dokonceni kopirovani na Google Disk.")
 
 if __name__ == "__main__":
     plt = platform.system()
