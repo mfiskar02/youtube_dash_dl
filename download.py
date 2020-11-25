@@ -4,7 +4,7 @@ from io import BytesIO
 import os
 import sys
 
-if not os.path.exists("./bin/ffmpeg.exe"):
+if not os.path.exists("./bin/ffmpeg.exe") or not os.path.exists("./bin/ffprobe.exe"):
     if not os.path.exists("./bin"):
         os.mkdir("./bin")
     zip_data = BytesIO()
@@ -27,4 +27,7 @@ if not os.path.exists("./bin/ffmpeg.exe"):
             with zf.open(zipped_file) as ffmpeg:
                 with open("bin/ffmpeg.exe", "wb") as f:
                     f.write(ffmpeg.read())
-
+        if "bin/ffprobe.exe" in zipped_file.filename:
+            with zf.open(zipped_file) as ffprobe:
+                with open("bin/ffprobe.exe", "wb") as f:
+                    f.write(ffprobe.read())
