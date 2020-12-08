@@ -39,9 +39,12 @@ class Stream:
 
 def get_mpd_data(video_url):
     page = s.get(video_url).text
-    mpd_link = (
-        page.split('dashManifestUrl\\":\\"')[-1].split('\\"')[0].replace("\/", "/")
-    )
+    if 'dashManifestUrl\\":\\"' in page:
+        mpd_link = page.split('dashManifestUrl\\":\\"')[-1].split('\\"')[0].replace("\/", "/")
+    elif 'dashManifestUrl":"' in page:
+        mpd_link = page.split('dashManifestUrl":"')[-1].split('"')[0].replace("\/", "/")
+    else:
+        return None
     return s.get(mpd_link).text
 
 
@@ -312,11 +315,14 @@ def main(ffmpeg_executable, ffprobe_executable):
             exit(1)
 
     mpd_data = get_mpd_data(url)
+    if mpd_data is None:
+        print("Error: Couldn't get MPD data!")
+        return 0
     a, v, m, s = process_mpd(mpd_data)
 
     if args.list_formats == True:
         info(a, v, m, s)
-        return
+        return 0
 
     if args.vf == -1:
         video_url = ""
@@ -347,7 +353,7 @@ def main(ffmpeg_executable, ffprobe_executable):
         duration = m * seg_len
     else:
         duration = (
-            (parse_datetime(args.end, args.utc)-parse_datetime(args.start, args.utc)).total_seconds()
+            (parse_datetime(args.end, args.utc) - parse_datetime(args.start, args.utc)).total_seconds()
             if args.duration == None
             else parse_duration(args.duration)
         )
