@@ -25,7 +25,7 @@ This will get the YouTube DASH manifest and calculate how much time you can go b
 ```shell
 python yt_ddl.py <URL> -o <OUTPUT>
 ```
-This will get the stream from the beginning to the point of running the command and save it as OUTPUT (Use .mp4 file as output only!).
+This will get the stream from the beginning to the point of running the command and save it as OUTPUT (Use .mp4 or .mkv file as output).
 
 ### Downloading specific part
 ```shell
@@ -37,7 +37,11 @@ python yt_ddl.py <URL> -o <OUTPUT> --start <START_TIME> --end <END_TIME>
 python yt_ddl.py https://www.youtube.com/watch?v=dQw4w9WgXcQ -o output.mp4 --start 2020-08-12T09:16 --duration 10m
 # Will download 10 minute video starting 2020-08-12T09:16
 ```
-Supp
+
+You can also use:
+* -s instead of --start
+* -d instead of --duration
+* -e instead of --end
 
 `START_TIME` and `END_TIME` can be one of the following formats:
 * `12:34`
@@ -46,6 +50,7 @@ Supp
 * `7.8 12:34:56`
 * `7.8.2009 12:34`
 * `7.8.2009 12:34:56`
+* `2009-08-07T12:34`
 * `2009-08-07T12:34:56`
 
 `DURATION` can be one of the following formats:
@@ -61,10 +66,8 @@ When the date part is omitted, today's date is assumed.
 
 The part of the video to be downloaded can be specified either by the start and end time, or by the start time and duration. 
 
-Local timezone is used unless `--utc` switch is provided.
-
-Only .mp4 output format is supported at the moment.
+(Local timezone - 1h) is used unless `--utc` switch is provided.
 
 ## Python compatibility
- * 3.7+
+ * 3.6+
 
