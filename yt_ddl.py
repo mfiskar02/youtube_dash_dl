@@ -59,6 +59,7 @@ def process_mpd(mpd_data):
         + len(tree.findall(".//def:S", nsmap))
         - 1
     )
+    seg_len = int(float(root.attrib["minimumUpdatePeriod"][2:-1]))
     attribute_sets = tree.findall(".//def:Period/def:AdaptationSet", nsmap)
     v_streams = []
     a_streams = []
@@ -76,7 +77,7 @@ def process_mpd(mpd_data):
                 v_streams.append(Stream(stream_type, bitrate, codec, quality, base_url))
     a_streams.sort(key=lambda x: x.bitrate, reverse=True)
     v_streams.sort(key=lambda x: x.bitrate, reverse=True)
-    return a_streams, v_streams, total_seg, d_time
+    return a_streams, v_streams, total_seg, d_time, seg_len
 
 
 async def fetch(session, url, i, pbar, sem):
@@ -318,7 +319,7 @@ def main(ffmpeg_executable, ffprobe_executable):
     if mpd_data is None:
         print("Error: Couldn't get MPD data!")
         return 0
-    a, v, m, s = process_mpd(mpd_data)
+    a, v, m, s, l = process_mpd(mpd_data)
 
     if args.list_formats == True:
         info(a, v, m, s)
@@ -333,14 +334,8 @@ def main(ffmpeg_executable, ffprobe_executable):
     else:
         audio_url = a[args.af].base_url
 
-    result = subprocess.run([ffprobe_executable, "-i", f"{video_url}{m}", "-show_entries", "format=start_time,duration", "-v", "quiet", "-of", "csv=p=0"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
-    seg_start, seg_end = (map(float, result.stdout.rstrip().decode("utf-8").split(",")))
-    seg_len = seg_end - seg_start
-
     start_time = (
-        s - timedelta(seconds=m * seg_len)
+        s - timedelta(seconds=m * l)
         if args.start == None
         else parse_datetime(args.start, args.utc)
     )
@@ -350,23 +345,24 @@ def main(ffmpeg_executable, ffprobe_executable):
         exit(1)
 
     if args.duration == None and args.end == None:
-        duration = m * seg_len
+        duration = m * l
     else:
-        duration = (
-            (parse_datetime(args.end, args.utc) - parse_datetime(args.start, args.utc)).total_seconds()
-            if args.duration == None
-            else parse_duration(args.duration)
-        )
+        if args.duration == None:
+            e_dtime = parse_datetime(args.end, args.utc)
+            s_dtime = s if args.start == None else parse_datetime(args.start, args.utc)
+            duration = (e_dtime - s_dtime).total_seconds()
+        else:
+            duration =  parse_duration(args.duration)
 
     if duration == -1:
         print("Error: Couldn't parse duration or end date!")
         exit(1)
 
-    start_segment = m - round((s - start_time).total_seconds() / seg_len)
+    start_segment = m - round((s - start_time).total_seconds() / l)
     if start_segment < 0:
         start_segment = 0
 
-    end_segment = start_segment + round(duration / seg_len)
+    end_segment = start_segment + round(duration / l)
     if end_segment > m:
         print("Error: You are requesting segments that dont exist yet!")
         exit(1)
