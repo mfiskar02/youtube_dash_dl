@@ -1,6 +1,5 @@
 requests
 lxml
 tqdm
-colorama
 aiohttp
 av
