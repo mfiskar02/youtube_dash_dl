@@ -222,7 +222,7 @@ def mux_to_file(output, aud, vid):
 
 def info(a, v, m, s):
     print(f"You can go back {int(m*2/3600)} hours and {int(m*2%3600/60)} minutes...")
-    print(f"Download avaliable from {(datetime.today() + timedelta(hours=1)) - timedelta(seconds=m*2)}")
+    print(f"Download avaliable from {(datetime.today() + timedelta(hours=2)) - timedelta(seconds=m*2)}")
     print("\nAudio stream ids")
     for i in range(len(a)):
         print(f"{i}:  {str(a[i])}")
@@ -266,7 +266,7 @@ def parse_datetime(inp, utc=True):
                 d_time = d_time.replace(year=today.year)
             if utc:
                 return d_time
-            return d_time - timedelta(hours=1)
+            return d_time - timedelta(hours=2)
         except ValueError:
             pass
     return -1
@@ -370,7 +370,7 @@ def main(ffmpeg_executable, ffprobe_executable):
 
     if not output_path:
         print(f"You can go back {int(m*2/3600)} hours and {int(m*2%3600/60)} minutes...")
-        print(f"Download avaliable from {(datetime.today() + timedelta(hours=1)) - timedelta(seconds=m*2)}")
+        print(f"Download avaliable from {(datetime.today() + timedelta(hours=2)) - timedelta(seconds=m*2)}")
         exit(0)
 
     if os.path.exists(output_path):
