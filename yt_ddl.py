@@ -15,8 +15,11 @@ import time
 import av                                   # av
 from lxml import etree                      # lxml
 from lxml.etree import QName                # lxml
+import lxml.html                            # lxml
 
 s = requests.Session()
+
+av.logging.set_level(av.logging.PANIC)
 
 class Stream:
     def __init__(self, stream_type, bitrate, codec, quality, base_url):
@@ -38,12 +41,22 @@ class Stream:
 
 
 def get_mpd_data(video_url):
-    page = s.get(video_url).text
-    if 'dashManifestUrl\\":\\"' in page:
-        mpd_link = page.split('dashManifestUrl\\":\\"')[-1].split('\\"')[0].replace("\/", "/")
-    elif 'dashManifestUrl":"' in page:
-        mpd_link = page.split('dashManifestUrl":"')[-1].split('"')[0].replace("\/", "/")
+    req = s.get(video_url)
+    if 'dashManifestUrl\\":\\"' in req.text:
+        mpd_link = req.text.split('dashManifestUrl\\":\\"')[-1].split('\\"')[0].replace("\/", "/")
+    elif 'dashManifestUrl":"' in req.text:
+        mpd_link = req.text.split('dashManifestUrl":"')[-1].split('"')[0].replace("\/", "/")
     else:
+        doc = lxml.html.fromstring(req.content)
+        form = doc.xpath('//form[@action="https://consent.youtube.com/s"]')
+        if len(form) > 0:
+            print("Consent check detected. Will try to pass...")
+            params = form[0].xpath('.//input[@type="hidden"]')
+            pars = {}
+            for par in params:
+                pars[par.attrib['name']] = par.attrib['value']
+            s.post("https://consent.youtube.com/s", data=pars)
+            return get_mpd_data(video_url)
         return None
     return s.get(mpd_link).text
 
@@ -95,12 +108,11 @@ async def get_segments(total_segments, video_base, audio_base):
     async with aiohttp.ClientSession() as session:
         sem = asyncio.Semaphore(12)
         tasks = []
-        eloop = asyncio.get_event_loop()
         for i in total_segments:
             if video_base:
-                tasks.append(eloop.create_task(fetch(session, f"{video_base}{i}", i, pbar, sem)))
+                tasks.append(asyncio.create_task(fetch(session, f"{video_base}{i}", i, pbar, sem)))
             if audio_base:
-                tasks.append(eloop.create_task(fetch(session, f"{audio_base}{i}", i, pbar, sem)))
+                tasks.append(asyncio.create_task(fetch(session, f"{audio_base}{i}", i, pbar, sem)))
         res = await asyncio.gather(*tasks)
     pbar.close()
     if video_base and not audio_base:
@@ -134,16 +146,14 @@ def mux_to_file(output, aud, vid):
             video_p = video.demux(v_in)
             output_video = output.add_stream(template=v_in)
             
-            h_dts = -1
+            last_pts = 0
             for packet in video_p:
                 if packet.dts is None:
                     continue
                 
-                if h_dts == -1:
-                    h_dts = packet.dts
-
-                packet.dts = packet.dts - h_dts
-                packet.pts = packet.dts
+                packet.dts = last_pts
+                packet.pts = last_pts
+                last_pts += packet.duration
 
                 packet.stream = output_video
                 output.mux(packet)
@@ -156,16 +166,14 @@ def mux_to_file(output, aud, vid):
             audio_p = audio.demux(a_in)
             output_audio = output.add_stream(template=a_in)
 
-            h_dts = -1
+            last_pts = 0
             for packet in audio_p:
                 if packet.dts is None:
                     continue
 
-                if h_dts == -1:
-                    h_dts = packet.dts
-
-                packet.dts = packet.dts - h_dts
-                packet.pts = packet.dts
+                packet.dts = last_pts
+                packet.pts = last_pts
+                last_pts += packet.duration
 
                 packet.stream = output_audio
                 output.mux(packet)
@@ -188,30 +196,26 @@ def mux_to_file(output, aud, vid):
         output_video = output.add_stream(template=v_in)
         output_audio = output.add_stream(template=a_in)
 
-        h_dts = -1
+        last_pts = 0
         for packet in video_p:
             if packet.dts is None:
                 continue
             
-            if h_dts == -1:
-                h_dts = packet.dts
-
-            packet.dts = packet.dts - h_dts
-            packet.pts = packet.dts
+            packet.dts = last_pts
+            packet.pts = last_pts
+            last_pts += packet.duration
 
             packet.stream = output_video
             output.mux(packet)
 
-        h_dts = -1
+        last_pts = 0
         for packet in audio_p:
             if packet.dts is None:
                 continue
 
-            if h_dts == -1:
-                h_dts = packet.dts
-
-            packet.dts = packet.dts - h_dts
-            packet.pts = packet.dts
+            packet.dts = last_pts
+            packet.pts = last_pts
+            last_pts += packet.duration
 
             packet.stream = output_audio
             output.mux(packet)
@@ -390,6 +394,7 @@ def main(ffmpeg_executable, ffprobe_executable):
     video, audio = asyncio.get_event_loop().run_until_complete(get_segments(total_segments, video_url, audio_url))
     # video = download(v[0], total_segments, 4)
     # audio = download(a[0], total_segments, 4)
+    print("Muxing into videofile...")
     mux_to_file(output_path, audio, video)
     print("\nVideo bylo uspesne stazeno, vyckejte jeste na dokonceni kopirovani na vas Google Disk.")
 
